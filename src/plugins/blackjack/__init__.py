@@ -2,14 +2,14 @@ from nonebot.rule import to_me
 from nonebot.typing import T_State
 from nonebot.adapters.cqhttp import Bot, Event, MessageSegment, Message, MessageEvent
 from nonebot import on_regex, on_message
-from .blackjack import Blackjack, GameMessage
+from .blackjack_game import Blackjack, GameMessage
 
 DEFAULT_BET = 100
 
 game = on_regex(r'^\[CQ:at.+?\] *打牌')
 
 
-def handle_message(msg: GameMessage):
+async def handle_message(msg: GameMessage):
     """handle the message received from game accordingly"""
     if msg.bot_action == msg.BOT_SEND:
         await game.send(msg.response)
@@ -24,9 +24,10 @@ def handle_message(msg: GameMessage):
 
 
 @game.handle()
-async def receive(bot: Bot, event: MessageEvent, state: T_State):
+async def first_receive(bot: Bot, event: MessageEvent, state: T_State):
     """First time getting a match from qq message"""
 
+    print("INSIDE @game.handle() right now")
     msg: Message = event.get_message()
     player_qq: str = event.get_user_id()
 
@@ -41,7 +42,7 @@ async def receive(bot: Bot, event: MessageEvent, state: T_State):
     game_obj = Blackjack(DEFAULT_BET, player_qq, dealer_qq)
     state['game'] = game_obj
     message = game_obj.game_start()
-    handle_message(message)
+    await handle_message(message)
 
 
 @game.receive()
@@ -51,7 +52,8 @@ async def game_loop(bot: Bot, event: MessageEvent, state: T_State):
     And this will be the MAIN GAME LOOP
     """
 
+    print("INSIDE @game.receive() right now")
     player_input = str(event.get_message())
     game_obj: Blackjack = state['game']
     message = game_obj.receive_input(player_input)
-    handle_message(message)
+    await handle_message(message)

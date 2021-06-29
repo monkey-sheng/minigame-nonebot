@@ -6,7 +6,7 @@ from nonebot import on_regex, on_message
 # PROBLEM: if @bot, the CQ at will be stripped therefore unable to match (as a result of get_message())
 # WHAT I CAN DO IS: copy over the on_regex impl and fix the part where get_message() is used
 # i.e. use Message(event.raw_message) to put together the original message
-game_init = on_regex(r'^\[CQ:at.+?\] *打牌')
+game_init = on_regex('blahblahblah')#on_regex(r'^\[CQ:at.+?\] *打牌')
 
 
 @game_init.handle()

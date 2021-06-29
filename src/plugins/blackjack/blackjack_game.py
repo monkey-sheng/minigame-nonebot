@@ -25,9 +25,7 @@ class Blackjack:
     cards: List[str] = list(map(lambda t: str(t[0]) + str(t[1]), product(card_suit, card_rank)))
 
     player_hand: List[str] = []  # cards in player's hand
-    player_total: int = 0
     dealer_hand: List[str] = []
-    dealer_total: int = 0
 
     class GamePhase(Enum):
         """describing the game phase/state"""
@@ -44,6 +42,13 @@ class Blackjack:
 
     def __init__(self, bet: int, player_qq: str, dealer_qq: str):
         """:param bet: the amount of bet for this game"""
+        self.bet, self.player_qq, self.dealer_qq = bet, player_qq, dealer_qq
+
+        self.card_suit = ['红桃', '黑桃', '方块', '梅花']
+        self.card_rank = list(range(2, 11)) + ['J', 'Q', 'K', 'A']
+        self.cards: List[str] = list(map(lambda t: str(t[0]) + str(t[1]), product(self.card_suit, self.card_rank)))
+        self.player_hand, self.dealer_hand = [], []
+
         self.total_money_player = DB.get_money(self.player_qq)
         self.total_money_dealer = DB.get_money(self.dealer_qq)
         if self.total_money_player is None:
@@ -55,8 +60,6 @@ class Blackjack:
             DB.insert_new(self.dealer_qq, NEW_PLAYER_MONEY)
             self.total_money_dealer = NEW_PLAYER_MONEY
         print('player money b4', self.total_money_player, 'dealer money b4', self.total_money_dealer)
-
-        self.bet, self.player_qq, self.dealer_qq = bet, player_qq, dealer_qq
 
     @staticmethod
     def _cards_sum(cards: List) -> int:
@@ -104,6 +107,7 @@ class Blackjack:
         game start, deal cards, returns Chinese string describing game state and possible actions
         NOTE: DO NOT USE BOT_REJECT IN HERE, THIS SHOULD ONLY BE RUN ONCE, MAIN GAME LOOP IS RIGHT AFTER THIS
         """
+        print("game_start, length of cards is", len(self.cards))
 
         # draw initial cards
         dealer_card1 = choice(self.cards)
@@ -169,8 +173,6 @@ class Blackjack:
         if player_input not in self.PHASE_ACTIONS[self.game_phase]:
             return GameMessage(GameMessage.BOT_REJECT, "请从可选行动中选择一项")
 
-        total_money_player, total_money_dealer = self.total_money_player, self.total_money_dealer
-
         common_response = "你的手牌：{0}\n共计{1}点\n" \
                           "庄家的手牌：{2}\n" \
                           "可选行动：{3}"
@@ -194,14 +196,14 @@ class Blackjack:
                                                       )
                     return GameMessage(GameMessage.BOT_REJECT, response)
                 else:  # player bust
-                    total_money_player -= self.bet
-                    total_money_dealer += self.bet
-                    DB.set_money(self.player_qq, total_money_player)
-                    DB.set_money(self.dealer_qq, total_money_dealer)
+                    self.total_money_player -= self.bet
+                    self.total_money_dealer += self.bet
+                    DB.set_money(self.player_qq, self.total_money_player)
+                    DB.set_money(self.dealer_qq, self.total_money_dealer)
 
                     response = bust_response.format(self.comma_concat(self.player_hand), curr_sum,
-                                                    self.dealer_hand[0], self._cards_sum(self.dealer_hand),
-                                                    self.bet, total_money_player, total_money_dealer
+                                                    self.comma_concat(self.dealer_hand), self._cards_sum(self.dealer_hand),
+                                                    self.bet, self.total_money_player, self.total_money_dealer
                                                     )
                     return GameMessage(GameMessage.BOT_FINISH, response)
 
@@ -216,14 +218,14 @@ class Blackjack:
                     return self._dealer_action(curr_sum)
 
                 else:  # player bust
-                    total_money_player -= self.bet
-                    total_money_dealer += self.bet
-                    DB.set_money(self.player_qq, total_money_player)
-                    DB.set_money(self.dealer_qq, total_money_dealer)
+                    self.total_money_player -= self.bet
+                    self.total_money_dealer += self.bet
+                    DB.set_money(self.player_qq, self.total_money_player)
+                    DB.set_money(self.dealer_qq, self.total_money_dealer)
 
                     response = bust_response.format(self.comma_concat(self.player_hand), curr_sum,
                                                     self.comma_concat(self.dealer_hand), self._cards_sum(self.dealer_hand),
-                                                    self.bet, total_money_player, total_money_dealer
+                                                    self.bet, self.total_money_player, self.total_money_dealer
                                                     )
                     return GameMessage(GameMessage.BOT_FINISH, response)
 
@@ -235,7 +237,7 @@ class Blackjack:
                 raise RuntimeError('should never have occurred, maybe mismatch of input handling and possible actions')
 
         # handle input for insurance case
-        elif self.GamePhase == self.GamePhase.INSURANCE:
+        elif self.game_phase == self.GamePhase.INSURANCE:
             if player_input == "是":
                 # check for dealer blackjack
                 if self._cards_sum(self.dealer_hand) == 21:  # dealer has blackjack
@@ -253,16 +255,23 @@ class Blackjack:
                     self.total_money_player -= insurance
                     self.total_money_dealer += insurance
                     # no need to do DB transactions here, not end game yet
-                    response = f"庄家没有黑杰克，${insurance}保险金白给了"
-                    return GameMessage(GameMessage.BOT_REJECT, response)
+                    insurance_info = f"庄家没有黑杰克，${insurance}保险金白给了"
+                    response = common_response.format(self.comma_concat(self.player_hand), self._cards_sum(self.player_hand),
+                                                      self.dealer_hand[0],
+                                                      self.comma_concat(self.PHASE_ACTIONS[self.game_phase])
+                                                      )
+                    return GameMessage(GameMessage.BOT_REJECT, insurance_info + response)
             elif player_input == "否":
                 self.game_phase = self.GamePhase.PLAYER_ACTION
                 response = common_response.format(self.comma_concat(self.player_hand), self._cards_sum(self.player_hand),
                                                   self.dealer_hand[0],
                                                   self.comma_concat(self.PHASE_ACTIONS[self.game_phase])
                                                   )
+                return GameMessage(GameMessage.BOT_REJECT, response)
             else:
                 raise RuntimeError('should never have occurred, maybe mismatch of input handling and possible actions')
+        else:
+            raise RuntimeError('should never have occurred, unknown game phase ' + str(self.game_phase))
 
     def _dealer_action(self, player_sum) -> GameMessage:
         """Player has finished action, the dealer now draws card to either beat the player, or bust"""
