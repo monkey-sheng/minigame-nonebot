@@ -2,7 +2,9 @@ from nonebot.rule import to_me
 from nonebot.typing import T_State
 from nonebot.adapters.cqhttp import Bot, Event, MessageSegment, Message, MessageEvent
 from nonebot import on_regex, on_message
+from random import randint, random
 from .blackjack_game import Blackjack, GameMessage
+from .database import DB
 
 DEFAULT_BET = 100
 
@@ -27,7 +29,6 @@ async def handle_message(msg: GameMessage):
 async def first_receive(bot: Bot, event: MessageEvent, state: T_State):
     """First time getting a match from qq message"""
 
-    print("INSIDE @game.handle() right now")
     msg: Message = event.get_message()
     player_qq: str = event.get_user_id()
 
@@ -52,8 +53,38 @@ async def game_loop(bot: Bot, event: MessageEvent, state: T_State):
     And this will be the MAIN GAME LOOP
     """
 
-    print("INSIDE @game.receive() right now")
     player_input = str(event.get_message())
     game_obj: Blackjack = state['game']
     message = game_obj.receive_input(player_input)
     await handle_message(message)
+
+
+help_msg = on_regex('帮助', rule=to_me())
+
+
+@help_msg.handle()
+async def print_help(bot: Bot, event: MessageEvent, state: T_State):
+    await help_msg.finish('21点帮助：\n发送 “@某人 打牌” 即可发起对战。\n'
+                          '然后根据bot提示选择行动，例如：要牌，停牌，双倍；按照基础21点规则。\n'
+                          '打牌没有时间间隔限制，也没有金钱限制，甚至可以@黑咕咕 抢钱')
+
+
+rob = on_regex('抢钱', rule=to_me())
+
+
+@rob.handle()
+async def robbed(bot: Bot, event: MessageEvent, state: T_State):
+    qq = event.get_user_id()
+    original_money = DB.get_money(qq)
+    if original_money is None:
+        await rob.finish('刚见面就抢钱，这合理吗')
+    if random() < 0.8:
+        amount = randint(1, 5) * 100
+        total = original_money + amount
+        DB.set_money(qq, total)
+        await rob.finish(f'你抢了黑咕咕${amount}，你的余额${total}，黑咕咕很伤心')
+    else:
+        amount = randint(1, 5) * 100
+        total = original_money - amount
+        DB.set_money(qq, total)
+        await rob.finish(f'黑咕咕心情不好决定倒打一耙，抢了你${amount}，你的余额${total}，黑咕咕心满意足了')
