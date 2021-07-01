@@ -125,8 +125,8 @@ class Blackjack:
 
         # check for player blackjack
         if self._cards_sum(self.player_hand) == 21:
-            game_desc = f"赌注：${self.bet}\n" + f"你的手牌：{self.comma_concat(self.player_hand)}\n" \
-                                              f"对方手牌：{self.comma_concat(self.dealer_hand)}\n"
+            game_desc = f"你的手牌：{self.comma_concat(self.player_hand)}\n" \
+                        f"对方手牌：{self.comma_concat(self.dealer_hand)}\n"
             if self._cards_sum(self.dealer_hand) == 21:  # both got blackjack, a tie
                 response = game_desc + "双方黑杰克，平局"
                 return GameMessage(GameMessage.BOT_FINISH, response)
@@ -140,25 +140,23 @@ class Blackjack:
             DB.set_money(self.player_qq, self.total_money_player)
             DB.set_money(self.dealer_qq, self.total_money_dealer)
 
-            response = game_desc + f"黑杰克！你赢得了双倍赌注{win_amount}\n" + \
+            response = game_desc + f"黑杰克！你赢得了双倍{win_amount}\n" + \
                                    f"你的余额：{self.total_money_player}，对手余额：{self.total_money_dealer}"
             return GameMessage(GameMessage.BOT_FINISH, response)
 
         # dealer has ace as first (revealed) card, enter insurance phase
         elif 'A' in self.dealer_hand[0]:
             self.game_phase = self.GamePhase.INSURANCE
-            response = f"赌注：${self.bet}\n" \
-                       f"你的手牌：{self.comma_concat(self.player_hand)}\n" \
-                       f"庄家的明牌是A，你可以选择花费${int(self.bet / 2)}买保险，\n" \
+            response = f"你的手牌：{self.comma_concat(self.player_hand)}\n" \
+                       f"对手的明牌是A，你可以选择花费{int(self.bet / 2)}保险，\n" \
                        f"可选行动：{self.comma_concat(self.PHASE_ACTIONS[self.game_phase])}"
             return GameMessage(GameMessage.BOT_SEND, response)
 
         # no blackjack on either side, common situation
         else:
             self.game_phase = self.GamePhase.PLAYER_ACTION
-            response = f"赌注：${self.bet}\n" \
-                       f"你的手牌：{self.comma_concat(self.player_hand)}\n共计{self._cards_sum(self.player_hand)}点\n" \
-                       f"庄家的明牌是{self.dealer_hand[0]}\n" \
+            response = f"你的手牌：{self.comma_concat(self.player_hand)}\n共计{self._cards_sum(self.player_hand)}点\n" \
+                       f"对手的明牌是{self.dealer_hand[0]}\n" \
                        f"可选行动：{self.comma_concat(self.PHASE_ACTIONS[self.game_phase])}"
             return GameMessage(GameMessage.BOT_SEND, response)
 
@@ -174,11 +172,11 @@ class Blackjack:
             return GameMessage(GameMessage.BOT_REJECT, "请从可选行动中选择一项")
 
         common_response = "你的手牌：{0}\n共计{1}点\n" \
-                          "庄家的手牌：{2}\n" \
+                          "对手的手牌：{2}\n" \
                           "可选行动：{3}"
 
         bust_response = "你的手牌：{0}\n共计{1}点，爆了\n" \
-                        "庄家的手牌：{2}\n共计{3}点\n" \
+                        "对手的手牌：{2}\n共计{3}点\n" \
                         "输了${4}，你的余额：{5}，对手余额：{6}"
 
         # handle input for common case
@@ -246,8 +244,8 @@ class Blackjack:
                     self.total_money_dealer -= self.bet
                     DB.set_money(self.player_qq, self.total_money_player)
                     DB.set_money(self.dealer_qq, self.total_money_dealer)
-                    response = f"庄家有黑杰克！\n庄家手牌：{self.comma_concat(self.dealer_hand)}\n" \
-                               f"赢了${self.bet}，你的余额：{self.total_money_player}，对手余额：{self.total_money_dealer}"
+                    response = f"对手有黑杰克！\n对手手牌：{self.comma_concat(self.dealer_hand)}\n" \
+                               f"赢了{self.bet}，你的余额：{self.total_money_player}，对手余额：{self.total_money_dealer}"
                     return GameMessage(GameMessage.BOT_FINISH, response)
                 else:  # dealer no blackjack, loses insurance (half of bet)
                     self.game_phase = self.GamePhase.PLAYER_ACTION
@@ -255,7 +253,7 @@ class Blackjack:
                     self.total_money_player -= insurance
                     self.total_money_dealer += insurance
                     # no need to do DB transactions here, not end game yet
-                    insurance_info = f"庄家没有黑杰克，${insurance}保险金白给了"
+                    insurance_info = f"对手没有黑杰克，{insurance}白给了"
                     response = common_response.format(self.comma_concat(self.player_hand), self._cards_sum(self.player_hand),
                                                       self.dealer_hand[0],
                                                       self.comma_concat(self.PHASE_ACTIONS[self.game_phase])
@@ -277,12 +275,12 @@ class Blackjack:
         """Player has finished action, the dealer now draws card to either beat the player, or bust"""
 
         dealer_bust_response = "你的手牌：{0}\n共计{1}点\n" \
-                               "庄家的手牌：{2}\n共计{3}点，爆了\n" \
-                               "赢了${4}，你的余额：{5}，对手余额：{6}"
+                               "对手的手牌：{2}\n共计{3}点，爆了\n" \
+                               "赢了{4}，你的余额：{5}，对手余额：{6}"
 
         dealer_win_response = "你的手牌：{0}\n共计{1}点\n" \
-                              "庄家的手牌：{2}\n共计{3}点\n" \
-                              "输了${4}，你的余额：{5}，对手余额：{6}"
+                              "对手的手牌：{2}\n共计{3}点\n" \
+                              "输了{4}，你的余额：{5}，对手余额：{6}"
 
         dealer_sum, drawn_cards = self._dealer_hit()
         if dealer_sum > 21:  # dealer bust
@@ -291,7 +289,7 @@ class Blackjack:
             DB.set_money(self.player_qq, self.total_money_player)
             DB.set_money(self.dealer_qq, self.total_money_dealer)
 
-            dealer_drawn = f"庄家摸牌：{self.comma_concat(drawn_cards)}\n"
+            dealer_drawn = f"对手摸牌：{self.comma_concat(drawn_cards)}\n"
             response = dealer_bust_response.format(self.comma_concat(self.player_hand), player_sum,
                                                    self.comma_concat(self.dealer_hand), dealer_sum,
                                                    self.bet, self.total_money_player, self.total_money_dealer
@@ -303,7 +301,7 @@ class Blackjack:
             DB.set_money(self.player_qq, self.total_money_player)
             DB.set_money(self.dealer_qq, self.total_money_dealer)
 
-            dealer_drawn = f"庄家摸牌：{self.comma_concat(drawn_cards)}\n"
+            dealer_drawn = f"对手摸牌：{self.comma_concat(drawn_cards)}\n"
             response = dealer_win_response.format(self.comma_concat(self.player_hand), player_sum,
                                                   self.comma_concat(self.dealer_hand), dealer_sum,
                                                   self.bet, self.total_money_player, self.total_money_dealer

@@ -69,7 +69,7 @@ async def print_help(bot: Bot, event: MessageEvent, state: T_State):
                           '打牌没有时间间隔限制，也没有金钱限制，甚至可以@黑咕咕 抢钱')
 
 
-rob = on_regex('抢钱', rule=to_me())
+rob = on_regex(' *抢钱 *', rule=to_me())
 
 
 @rob.handle()
@@ -77,14 +77,16 @@ async def robbed(bot: Bot, event: MessageEvent, state: T_State):
     qq = event.get_user_id()
     original_money = DB.get_money(qq)
     if original_money is None:
-        await rob.finish('刚见面就抢钱，这合理吗')
+        await rob.finish('刚见面就抢，这合理吗')
+    elif original_money > 200:
+        await rob.finish('你好有钱，憋抢啦')
     if random() < 0.8:
         amount = randint(1, 5) * 100
         total = original_money + amount
         DB.set_money(qq, total)
-        await rob.finish(f'你抢了黑咕咕${amount}，你的余额${total}，黑咕咕很伤心')
+        await rob.finish(f'你抢了黑咕咕{amount}，你的余额{total}，黑咕咕很伤心')
     else:
         amount = randint(1, 5) * 100
         total = original_money - amount
         DB.set_money(qq, total)
-        await rob.finish(f'黑咕咕心情不好决定倒打一耙，抢了你${amount}，你的余额${total}，黑咕咕心满意足了')
+        await rob.finish(f'黑咕咕心情不好决定倒打一耙，抢了你{amount}，你的余额{total}，黑咕咕心满意足了')
