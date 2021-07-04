@@ -298,7 +298,7 @@ class Blackjack:
                        "对手的手牌：{2}\n共计{3}点\n" \
                        "平局，你的余额：{4}，对手余额：{5}"
 
-        dealer_sum, drawn_cards = self._dealer_hit()
+        dealer_sum, drawn_cards = self._dealer_hit(player_sum)
         if dealer_sum > 21:  # dealer bust
             self.total_money_player = DB.get_money(self.player_qq)
             self.total_money_dealer = DB.get_money(self.dealer_qq)
@@ -314,8 +314,8 @@ class Blackjack:
                                                    )
             return GameMessage(GameMessage.BOT_FINISH, dealer_drawn + response)
 
-        elif dealer_sum == 21:
-            # must be a draw, i.e. both got 21
+        elif dealer_sum == player_sum == 21:
+            # a draw (and the only possible draw scenario), i.e. both got 21
             dealer_drawn = f"对手摸牌：{self.comma_concat(drawn_cards)}\n"
             response = tie_response.format(self.comma_concat(self.player_hand), player_sum,
                                            self.comma_concat(self.dealer_hand), dealer_sum,
@@ -338,21 +338,22 @@ class Blackjack:
                                                   )
             return GameMessage(GameMessage.BOT_FINISH, dealer_drawn + response)
 
-    def _dealer_hit(self) -> Tuple[int, List[str]]:
+    def _dealer_hit(self, player_hand_sum) -> Tuple[int, List[str]]:
         """
         Dealer performs hits in order to beat the player's hand, or gets exactly 21,
         has the side effect of adding card to dealer_hand
         :return the final sum of dealer's hand, and the list of cards drawn
         """
-        player_hand_sum = self._cards_sum(self.player_hand)
         dealer_hand_sum = self._cards_sum(self.dealer_hand)
 
-        if dealer_hand_sum >= player_hand_sum:
+        # even if it's going to be a draw with the player also having 21, no need to draw anymore
+        if dealer_hand_sum > player_hand_sum or dealer_hand_sum == 21:
             # no need to draw any card
             return dealer_hand_sum, []
         else:
             drawn_cards = []
             while dealer_hand_sum <= player_hand_sum:
+                # stop at 21, this is the both 21 draw scenario
                 if dealer_hand_sum == 21:
                     return dealer_hand_sum, drawn_cards
                 new_card = choice(self.cards)
