@@ -7,6 +7,8 @@ from .database import DB
 
 NEW_PLAYER_MONEY = 500
 
+# NOTE: ALL set_money must be done after get_money, since the stored field values may be outdated by other sessions
+
 
 class GameMessage:
     """used to share information with bot, tells bot how to respond (i.e. reject/finish/etc.)"""
@@ -78,7 +80,6 @@ class Blackjack:
                 return 11
             else:
                 rank = int(rank)
-                assert 2 <= rank <= 10  # TODO
                 return rank
 
         ranks_list = get_ranks_list(cards)
@@ -134,9 +135,11 @@ class Blackjack:
             # else win double due to blackjack
             win_amount = int(2 * self.bet)
 
-            # handle winning money and db here
+            self.total_money_player = DB.get_money(self.player_qq)
+            self.total_money_dealer = DB.get_money(self.dealer_qq)
             self.total_money_player += win_amount
             self.total_money_dealer -= win_amount
+
             DB.set_money(self.player_qq, self.total_money_player)
             DB.set_money(self.dealer_qq, self.total_money_dealer)
 
@@ -194,6 +197,8 @@ class Blackjack:
                                                       )
                     return GameMessage(GameMessage.BOT_REJECT, response)
                 else:  # player bust
+                    self.total_money_player = DB.get_money(self.player_qq)
+                    self.total_money_dealer = DB.get_money(self.dealer_qq)
                     self.total_money_player -= self.bet
                     self.total_money_dealer += self.bet
                     DB.set_money(self.player_qq, self.total_money_player)
@@ -216,6 +221,8 @@ class Blackjack:
                     return self._dealer_action(curr_sum)
 
                 else:  # player bust
+                    self.total_money_player = DB.get_money(self.player_qq)
+                    self.total_money_dealer = DB.get_money(self.dealer_qq)
                     self.total_money_player -= self.bet
                     self.total_money_dealer += self.bet
                     DB.set_money(self.player_qq, self.total_money_player)
@@ -240,6 +247,8 @@ class Blackjack:
                 # check for dealer blackjack
                 if self._cards_sum(self.dealer_hand) == 21:  # dealer has blackjack
                     # dealer has blackjack, player wins bet amount
+                    self.total_money_player = DB.get_money(self.player_qq)
+                    self.total_money_dealer = DB.get_money(self.dealer_qq)
                     self.total_money_player += self.bet
                     self.total_money_dealer -= self.bet
                     DB.set_money(self.player_qq, self.total_money_player)
@@ -250,10 +259,13 @@ class Blackjack:
                 else:  # dealer no blackjack, loses insurance (half of bet)
                     self.game_phase = self.GamePhase.PLAYER_ACTION
                     insurance = int(self.bet / 2)
+                    self.total_money_player = DB.get_money(self.player_qq)
+                    self.total_money_dealer = DB.get_money(self.dealer_qq)
                     self.total_money_player -= insurance
                     self.total_money_dealer += insurance
-                    # no need to do DB transactions here, not end game yet
-                    insurance_info = f"对手没有黑杰克，{insurance}白给了"
+                    DB.set_money(self.player_qq, self.total_money_player)
+                    DB.set_money(self.dealer_qq, self.total_money_dealer)
+                    insurance_info = f"对手没有黑杰克，{insurance}白给了\n"
                     response = common_response.format(self.comma_concat(self.player_hand), self._cards_sum(self.player_hand),
                                                       self.dealer_hand[0],
                                                       self.comma_concat(self.PHASE_ACTIONS[self.game_phase])
@@ -282,8 +294,14 @@ class Blackjack:
                               "对手的手牌：{2}\n共计{3}点\n" \
                               "输了{4}，你的余额：{5}，对手余额：{6}"
 
+        tie_response = "你的手牌：{0}\n共计{1}点\n" \
+                       "对手的手牌：{2}\n共计{3}点\n" \
+                       "平局，你的余额：{4}，对手余额：{5}"
+
         dealer_sum, drawn_cards = self._dealer_hit()
         if dealer_sum > 21:  # dealer bust
+            self.total_money_player = DB.get_money(self.player_qq)
+            self.total_money_dealer = DB.get_money(self.dealer_qq)
             self.total_money_player += self.bet
             self.total_money_dealer -= self.bet
             DB.set_money(self.player_qq, self.total_money_player)
@@ -295,7 +313,19 @@ class Blackjack:
                                                    self.bet, self.total_money_player, self.total_money_dealer
                                                    )
             return GameMessage(GameMessage.BOT_FINISH, dealer_drawn + response)
+
+        elif dealer_sum == 21:
+            # must be a draw, i.e. both got 21
+            dealer_drawn = f"对手摸牌：{self.comma_concat(drawn_cards)}\n"
+            response = tie_response.format(self.comma_concat(self.player_hand), player_sum,
+                                           self.comma_concat(self.dealer_hand), dealer_sum,
+                                           self.total_money_player, self.total_money_dealer
+                                           )
+            return GameMessage(GameMessage.BOT_FINISH, dealer_drawn + response)
+
         else:  # both not bust, dealer must have higher sum as an invariant of `_dealer_hit()`
+            self.total_money_player = DB.get_money(self.player_qq)
+            self.total_money_dealer = DB.get_money(self.dealer_qq)
             self.total_money_player -= self.bet
             self.total_money_dealer += self.bet
             DB.set_money(self.player_qq, self.total_money_player)
@@ -308,24 +338,23 @@ class Blackjack:
                                                   )
             return GameMessage(GameMessage.BOT_FINISH, dealer_drawn + response)
 
-    def get_player_actions_list(self) -> List[str]:
-        """returns a list of Chinese strings representing available actions"""
-        pass
-
     def _dealer_hit(self) -> Tuple[int, List[str]]:
         """
-        Dealer performs hits in order to beat the player's hand, has the side effect of adding card to dealer_hand
+        Dealer performs hits in order to beat the player's hand, or gets exactly 21,
+        has the side effect of adding card to dealer_hand
         :return the final sum of dealer's hand, and the list of cards drawn
         """
         player_hand_sum = self._cards_sum(self.player_hand)
         dealer_hand_sum = self._cards_sum(self.dealer_hand)
 
-        if dealer_hand_sum > player_hand_sum:
+        if dealer_hand_sum >= player_hand_sum:
             # no need to draw any card
             return dealer_hand_sum, []
         else:
             drawn_cards = []
             while dealer_hand_sum <= player_hand_sum:
+                if dealer_hand_sum == 21:
+                    return dealer_hand_sum, drawn_cards
                 new_card = choice(self.cards)
                 drawn_cards.append(new_card)
                 self.cards.remove(new_card)

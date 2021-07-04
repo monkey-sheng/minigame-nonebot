@@ -32,15 +32,16 @@ async def game_result_received(bot: Bot, event: MessageEvent, state: T_State):
     opponent_qq: str = at_msg2.data['qq']
     # get the number of wins and losses
     pattern = re.compile(r' *[平胜负] *[平胜负] *[平胜负] *[平胜负] *[平胜负] *[平胜负] *')
-    result: str = pattern.findall(str(msg))[0]  # there should always be a find from bai gu gu message
+    results: list = pattern.findall(str(msg))  # there should always be a find from bai gu gu message
     # may be this wasn't from bai gu gu, just a similar message
-    if len(result) == 0:
+    if len(results) == 0:
         return
+    result = results[0]
     wins, losses, ties = result.count('胜'), result.count('负'), result.count('平')
 
-    if opponent_qq == 2969660651:  # bot itself
+    if opponent_qq == '2969660651':  # bot itself
         await pokemon.finish(choice(['好疼', '别打我求求辣', '你怎么不打白咕咕呢']))
-    elif initiator_qq == 2969660651:  # should not happen
+    elif initiator_qq == '2969660651':  # should not happen
         print('should not happen bot actively fought someone')
         await pokemon.finish('✌')
     elif wins == losses:
@@ -95,9 +96,10 @@ async def got_result(bot: Bot, event: MessageEvent, state: T_State):
     """
     msg: Message = event.get_message()
     pattern = re.compile(r' *[平胜负] *[平胜负] *[平胜负] *[平胜负] *[平胜负] *[平胜负] *')
-    result: str = pattern.findall(str(msg))[0]  # there should always be a find
-    if len(result) == 0:  # MAYBE OTHER MESSAGES, e.g. can no longer fight due to cool down
+    results: list = pattern.findall(str(msg))  # there should always be a find
+    if len(results) == 0:
         return
+    result = results[0]
     wins, losses, ties = result.count('胜'), result.count('负'), result.count('平')
 
     if ties == 6:
