@@ -1,6 +1,6 @@
 from typing import List, Dict, Tuple
 from itertools import product
-from random import choice
+from random import choice, random
 import re
 from enum import Enum
 from .database import DB
@@ -314,8 +314,8 @@ class Blackjack:
                                                    )
             return GameMessage(GameMessage.BOT_FINISH, dealer_drawn + response)
 
-        elif dealer_sum == player_sum == 21:
-            # a draw (and the only possible draw scenario), i.e. both got 21
+        elif dealer_sum == player_sum:
+            # a draw, i.e. both got 21 or dealer chose to accept a tie
             dealer_drawn = f"对手摸牌：{self.comma_concat(drawn_cards)}\n"
             response = tie_response.format(self.comma_concat(self.player_hand), player_sum,
                                            self.comma_concat(self.dealer_hand), dealer_sum,
@@ -344,21 +344,40 @@ class Blackjack:
         has the side effect of adding card to dealer_hand
         :return the final sum of dealer's hand, and the list of cards drawn
         """
+
         dealer_hand_sum = self._cards_sum(self.dealer_hand)
+        drawn_cards = []
+
+        def draw_a_card():
+            new_card = choice(self.cards)
+            drawn_cards.append(new_card)
+            self.cards.remove(new_card)
+            self.dealer_hand.append(new_card)
 
         # even if it's going to be a draw with the player also having 21, no need to draw anymore
         if dealer_hand_sum > player_hand_sum or dealer_hand_sum == 21:
             # no need to draw any card
             return dealer_hand_sum, []
         else:
-            drawn_cards = []
             while dealer_hand_sum <= player_hand_sum:
+                # dealer can choose, rather randomly, to accept a tie
+                if dealer_hand_sum == player_hand_sum:
+                    # some randomness here
+                    if dealer_hand_sum < 16:
+                        # most definitely hit
+                        if random() < 0.8:
+                            draw_a_card()
+                    elif dealer_hand_sum <= 18:
+                        if random() < 0.5:
+                            draw_a_card()
+                    else:
+                        if random() < 0.2:
+                            draw_a_card()
+
                 # stop at 21, this is the both 21 draw scenario
                 if dealer_hand_sum == 21:
                     return dealer_hand_sum, drawn_cards
-                new_card = choice(self.cards)
-                drawn_cards.append(new_card)
-                self.cards.remove(new_card)
-                self.dealer_hand.append(new_card)
+
+                draw_a_card()
                 dealer_hand_sum = self._cards_sum(self.dealer_hand)
             return dealer_hand_sum, drawn_cards

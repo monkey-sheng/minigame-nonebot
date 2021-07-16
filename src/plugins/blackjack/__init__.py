@@ -78,7 +78,7 @@ async def robbed(bot: Bot, event: MessageEvent, state: T_State):
     original_money = DB.get_money(qq)
     if original_money is None:
         await rob.finish('刚见面就抢，这合理吗')
-    elif original_money > 200:
+    elif original_money >= 200:
         await rob.finish('你好有钱，憋抢啦')
     if random() < 0.8:
         amount = randint(1, 5) * 100
