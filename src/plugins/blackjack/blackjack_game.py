@@ -133,15 +133,8 @@ class Blackjack:
                 return GameMessage(GameMessage.BOT_FINISH, response)
 
             # else win double due to blackjack
-            win_amount = int(2 * self.bet)
-
-            self.total_money_player = DB.get_money(self.player_qq)
-            self.total_money_dealer = DB.get_money(self.dealer_qq)
-            self.total_money_player += win_amount
-            self.total_money_dealer -= win_amount
-
-            DB.set_money(self.player_qq, self.total_money_player)
-            DB.set_money(self.dealer_qq, self.total_money_dealer)
+            win_amount = self.bet = int(2 * self.bet)
+            self.player_win_DB_transaction()
 
             response = game_desc + f"黑杰克！你赢得了双倍{win_amount}\n" + \
                                    f"你的余额：{self.total_money_player}，对手余额：{self.total_money_dealer}"
@@ -197,12 +190,7 @@ class Blackjack:
                                                       )
                     return GameMessage(GameMessage.BOT_REJECT, response)
                 else:  # player bust
-                    self.total_money_player = DB.get_money(self.player_qq)
-                    self.total_money_dealer = DB.get_money(self.dealer_qq)
-                    self.total_money_player -= self.bet
-                    self.total_money_dealer += self.bet
-                    DB.set_money(self.player_qq, self.total_money_player)
-                    DB.set_money(self.dealer_qq, self.total_money_dealer)
+                    self.dealer_win_DB_transaction()
 
                     response = bust_response.format(self.comma_concat(self.player_hand), curr_sum,
                                                     self.comma_concat(self.dealer_hand), self._cards_sum(self.dealer_hand),
@@ -221,12 +209,7 @@ class Blackjack:
                     return self._dealer_action(curr_sum)
 
                 else:  # player bust
-                    self.total_money_player = DB.get_money(self.player_qq)
-                    self.total_money_dealer = DB.get_money(self.dealer_qq)
-                    self.total_money_player -= self.bet
-                    self.total_money_dealer += self.bet
-                    DB.set_money(self.player_qq, self.total_money_player)
-                    DB.set_money(self.dealer_qq, self.total_money_dealer)
+                    self.dealer_win_DB_transaction()
 
                     response = bust_response.format(self.comma_concat(self.player_hand), curr_sum,
                                                     self.comma_concat(self.dealer_hand), self._cards_sum(self.dealer_hand),
@@ -247,12 +230,7 @@ class Blackjack:
                 # check for dealer blackjack
                 if self._cards_sum(self.dealer_hand) == 21:  # dealer has blackjack
                     # dealer has blackjack, player wins bet amount
-                    self.total_money_player = DB.get_money(self.player_qq)
-                    self.total_money_dealer = DB.get_money(self.dealer_qq)
-                    self.total_money_player += self.bet
-                    self.total_money_dealer -= self.bet
-                    DB.set_money(self.player_qq, self.total_money_player)
-                    DB.set_money(self.dealer_qq, self.total_money_dealer)
+                    self.player_win_DB_transaction()
                     response = f"对手有黑杰克！\n对手手牌：{self.comma_concat(self.dealer_hand)}\n" \
                                f"赢了{self.bet}，你的余额：{self.total_money_player}，对手余额：{self.total_money_dealer}"
                     return GameMessage(GameMessage.BOT_FINISH, response)
@@ -298,14 +276,29 @@ class Blackjack:
                        "对手的手牌：{2}\n共计{3}点\n" \
                        "平局，你的余额：{4}，对手余额：{5}"
 
-        dealer_sum, drawn_cards = self._dealer_hit(player_sum)
+        charlie_rule_response = "你的手牌：{0}\n" \
+                                "对手的手牌：{1}\n共计{2}点" \
+                                "五小龙直接获胜，赢了双倍{3}，你的余额：{4}，对手余额：{5}"
+
+        # 5-card Charlie rule here, i.e. player wins with 5 cards not bust, unless dealer has blackjack
+        if len(self.player_hand) >= 5:
+            dealer_sum = self._cards_sum(self.dealer_hand)
+            if dealer_sum != 21:  # dealer no blackjack
+                # player wins double automatically, since the precondition is player not bust
+                self.bet *= 2
+                self.player_win_DB_transaction()
+                response = charlie_rule_response.format(self.comma_concat(self.player_hand), self.comma_concat(self.dealer_hand), dealer_sum, self.bet, self.total_money_player, self.total_money_dealer)
+                return GameMessage(GameMessage.BOT_FINISH, response)
+            else:  # dealer has blackjack, which is better (the best actually)
+                self.dealer_win_DB_transaction()
+                response = dealer_win_response.format(self.comma_concat(self.player_hand), player_sum, self.comma_concat(self.dealer_hand), dealer_sum,
+                                                      self.bet, self.total_money_player, self.total_money_dealer)
+                explanation = "对手有黑杰克，大于你的五小龙\n"
+                return GameMessage(GameMessage.BOT_FINISH, explanation + response)
+
+        dealer_sum, drawn_cards = self._dealer_hit(player_sum)  # dealer draw cards
         if dealer_sum > 21:  # dealer bust
-            self.total_money_player = DB.get_money(self.player_qq)
-            self.total_money_dealer = DB.get_money(self.dealer_qq)
-            self.total_money_player += self.bet
-            self.total_money_dealer -= self.bet
-            DB.set_money(self.player_qq, self.total_money_player)
-            DB.set_money(self.dealer_qq, self.total_money_dealer)
+            self.player_win_DB_transaction()
 
             dealer_drawn = f"对手摸牌：{self.comma_concat(drawn_cards)}\n"
             response = dealer_bust_response.format(self.comma_concat(self.player_hand), player_sum,
@@ -323,13 +316,8 @@ class Blackjack:
                                            )
             return GameMessage(GameMessage.BOT_FINISH, dealer_drawn + response)
 
-        else:  # both not bust, dealer must have higher sum as an invariant of `_dealer_hit()`
-            self.total_money_player = DB.get_money(self.player_qq)
-            self.total_money_dealer = DB.get_money(self.dealer_qq)
-            self.total_money_player -= self.bet
-            self.total_money_dealer += self.bet
-            DB.set_money(self.player_qq, self.total_money_player)
-            DB.set_money(self.dealer_qq, self.total_money_dealer)
+        else:  # both not bust and not a tie, dealer must have higher sum as an invariant of `_dealer_hit()`
+            self.dealer_win_DB_transaction()
 
             dealer_drawn = f"对手摸牌：{self.comma_concat(drawn_cards)}\n"
             response = dealer_win_response.format(self.comma_concat(self.player_hand), player_sum,
@@ -362,22 +350,49 @@ class Blackjack:
             while dealer_hand_sum <= player_hand_sum:
                 # dealer can choose, rather randomly, to accept a tie
                 if dealer_hand_sum == player_hand_sum:
-                    # some randomness here
+                    # stop at 21, this is the both 21 draw scenario
+                    if dealer_hand_sum == 21:
+                        return dealer_hand_sum, drawn_cards
+
+                    # otherwise, some randomness here
+                    chance = random()
+                    accept_tie = False
                     if dealer_hand_sum < 16:
                         # most definitely hit
-                        if random() < 0.8:
+                        if chance < 0.8:
                             draw_a_card()
+                        else:
+                            accept_tie = True
                     elif dealer_hand_sum <= 18:
-                        if random() < 0.5:
+                        if chance < 0.5:
                             draw_a_card()
+                        else:
+                            accept_tie = True
                     else:
-                        if random() < 0.2:
+                        if chance < 0.2:
                             draw_a_card()
-
-                # stop at 21, this is the both 21 draw scenario
-                if dealer_hand_sum == 21:
-                    return dealer_hand_sum, drawn_cards
-
-                draw_a_card()
+                        else:
+                            accept_tie = True
+                    if accept_tie:
+                        return dealer_hand_sum, drawn_cards
+                else:  # dealer's hand strictly less than player's, draw a card
+                    draw_a_card()
+                # must have drawn a card here, calc new dealer_hand_sum
                 dealer_hand_sum = self._cards_sum(self.dealer_hand)
             return dealer_hand_sum, drawn_cards
+
+    def player_win_DB_transaction(self):
+        self.total_money_player = DB.get_money(self.player_qq)
+        self.total_money_dealer = DB.get_money(self.dealer_qq)
+        self.total_money_player += self.bet
+        self.total_money_dealer -= self.bet
+        DB.set_money(self.player_qq, self.total_money_player)
+        DB.set_money(self.dealer_qq, self.total_money_dealer)
+
+    def dealer_win_DB_transaction(self):
+        self.total_money_player = DB.get_money(self.player_qq)
+        self.total_money_dealer = DB.get_money(self.dealer_qq)
+        self.total_money_player -= self.bet
+        self.total_money_dealer += self.bet
+        DB.set_money(self.player_qq, self.total_money_player)
+        DB.set_money(self.dealer_qq, self.total_money_dealer)
