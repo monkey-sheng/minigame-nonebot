@@ -9,7 +9,12 @@ import json
 
 # check against this list so that not anyone can use send dynamic
 ALLOWED_USERS_QQ = ['1092997224', '1330992777']  # me and malivergos
-COOKIES = json.load(open('bilibili.txt', 'r'))
+FP = open('bilibili.txt', 'r')
+INFOS = json.load(FP)
+COOKIES = INFOS['data']['cookie_info']['cookies']
+ACCESS_TOKEN = INFOS['data']['token_info']['access_token']
+REFRESH_TOKEN = INFOS['data']['token_info']['refresh_token']
+FP.close()
 
 
 def is_qualified_user() -> Rule:
@@ -26,6 +31,7 @@ def is_qualified_user() -> Rule:
 CLIENT = BilibiliClient()
 for cookie in COOKIES:
     CLIENT._session.cookies.set(cookie['name'], cookie['value'])
+CLIENT.access_token, CLIENT.refresh_token = ACCESS_TOKEN, REFRESH_TOKEN
 CLIENT.refresh()  # refresh at launch
 
 dynamic = on_regex('发动态', rule=to_me() & is_qualified_user())

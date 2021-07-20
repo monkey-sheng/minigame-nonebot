@@ -149,6 +149,10 @@ class BilibiliClient:
         response = self._session.post(url, data=payload, headers=headers).json()
         print('response from refresh token post request', response)
         if response and response.get("code") == 0:
+            # also records the new response in the file
+            with open('bilibili.txt', 'w') as fp:
+                fp.write(json.dumps(response))
+
             for cookie in response['data']['cookie_info']['cookies']:
                 self._session.cookies.set(cookie['name'], cookie['value'], domain=".bilibili.com")
             self.access_token = response['data']['token_info']['access_token']
