@@ -141,6 +141,7 @@ class BilibiliClient:
         self.dynamic_img_list.append(img_bytes)
         return True
 
+    # DON'T call this, unless login by password works again, which sets the tokens
     def refresh(self):
         url = "https://passport.bilibili.com/api/v2/oauth2/refresh_token"
         param = f"access_key={self.access_token}&appkey={self.APP_KEY}&refresh_token={self.refresh_token}&ts={int(time.time())}"

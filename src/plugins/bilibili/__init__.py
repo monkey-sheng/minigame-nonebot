@@ -12,8 +12,11 @@ ALLOWED_USERS_QQ = ['1092997224', '1330992777']  # me and malivergos
 FP = open('bilibili.txt', 'r')
 INFOS = json.load(FP)
 COOKIES = INFOS['data']['cookie_info']['cookies']
-ACCESS_TOKEN = INFOS['data']['token_info']['access_token']
-REFRESH_TOKEN = INFOS['data']['token_info']['refresh_token']
+try:
+    ACCESS_TOKEN = INFOS['data']['token_info']['access_token']
+    REFRESH_TOKEN = INFOS['data']['token_info']['refresh_token']
+except:
+    ACCESS_TOKEN, REFRESH_TOKEN = None, None
 FP.close()
 
 
@@ -30,9 +33,9 @@ def is_qualified_user() -> Rule:
 # CLIENT = BilibiliClient(USER_NAME, PASSWORD)
 CLIENT = BilibiliClient()
 for cookie in COOKIES:
-    CLIENT._session.cookies.set(cookie['name'], cookie['value'])
+    CLIENT._session.cookies.set(cookie['name'], cookie['value'], domain=".bilibili.com")
 CLIENT.access_token, CLIENT.refresh_token = ACCESS_TOKEN, REFRESH_TOKEN
-CLIENT.refresh()  # refresh at launch
+# CLIENT.refresh()  # refresh at launch
 
 dynamic = on_regex('发动态', rule=to_me() & is_qualified_user())
 
@@ -40,7 +43,7 @@ dynamic = on_regex('发动态', rule=to_me() & is_qualified_user())
 @dynamic.handle()
 async def first_receive(bot: Bot, event: MessageEvent, state: T_State):
     CLIENT.clear()  # make sure to start afresh
-    CLIENT.refresh()  # also refreshes its cookies and tokens
+    # CLIENT.refresh()  # also refreshes its cookies and tokens
     await dynamic.send('接收中')
 
 
@@ -92,3 +95,44 @@ async def client_login(bot: Bot, event: MessageEvent, state: T_State):
         await manual_login.finish('登录成功')
     else:
         await manual_login.finish('登录遇到一些意外，但不一定失败了')
+
+
+manual_set_username_password = on_regex('/账号密码', rule=to_me() & is_qualified_user())
+
+
+@manual_set_username_password.handle()
+async def prompt_username_password(bot: Bot, event: MessageEvent, state: T_State):
+    await manual_set_username_password.send('输入账号和密码，空格分隔')
+
+
+@manual_set_username_password.receive()
+async def set_username_password(bot: Bot, event: MessageEvent, state: T_State):
+    msg = str(event.get_message()).split(' ')
+    CLIENT.username, CLIENT.password = msg[0].strip(), msg[1].strip()
+    await manual_set_username_password.finish('设置完毕')
+
+
+manual_set_cookies = on_regex('/cookies', rule=to_me() & is_qualified_user())
+
+
+@manual_set_cookies.handle()
+async def prompt_set_cookies(bot: Bot, event: MessageEvent, state: T_State):
+    await manual_set_cookies.send('输入cookies的值，name1=value1; name2=value2;形式')
+
+
+@manual_set_cookies.receive()
+async def set_cookies(bot: Bot, event: MessageEvent, state: T_State):
+    cookies_msg = str(event.get_message()).split(';')
+    with open('bilibili.txt', 'r') as fp:
+        original_json = json.load(fp)
+
+    original_json['data']['cookie_info']['cookies'] = []
+    for cookie_str in cookies_msg:
+        name_val_pair = cookie_str.strip()
+        name_val_list = name_val_pair.split('=')
+        cookie_name, cookie_value = name_val_list[0].strip(), name_val_list[1].strip()
+        CLIENT._session.cookies.set(cookie_name, cookie_value, domain=".bilibili.com")
+        original_json['data']['cookie_info']['cookies'].append({"name": cookie_name, "value": cookie_value})
+    with open('bilibili.txt', 'w') as fp:
+        fp.write(json.dumps(original_json))
+    await manual_set_cookies.finish('cookies设置完毕')
