@@ -40,12 +40,12 @@ async def game_result_received(bot: Bot, event: MessageEvent, state: T_State):
     wins, losses, ties = result.count('胜'), result.count('负'), result.count('平')
 
     if opponent_qq == '2969660651':  # bot itself
-        await pokemon.finish(choice(['好疼', '别打我求求辣', '你怎么不打白咕咕呢']))
+        await pokemon.finish(choice(['好疼', '别打我求求辣', '你怎么不打白咕咕呢', '奶奶滴，给我玩阴的是吧！']))
     elif initiator_qq == '2969660651':  # should not happen
         print('should not happen bot actively fought someone')
         await pokemon.finish('✌')
     elif wins == losses:
-        response = choice(['有来有回', '战况焦灼']) + '  我也来试试'
+        response = choice(['有来有回，我也来试试', '战况焦灼，我也来试试', '嘿嘿，哈哈哈哈，黑咕咕来喽', '都不赢是吧，赢，赢啊！'])
         fight_against = 'initiator' if random() > 0.5 else 'opponent'
         state['situation'] = Situation.ONE_EACH
         state['fighting'] = fight_against
@@ -64,10 +64,10 @@ async def game_result_received(bot: Bot, event: MessageEvent, state: T_State):
         state['fighting'] = fight_against
         state['qq'] = initiator_qq if fight_against == 'initiator' else opponent_qq
         if (fight_against == 'initiator' and wins > losses) or (fight_against == 'opponent' and wins < losses):
-            response = choice(['路见不平拔刀相助', '我不服', '强', '那你能赢我吗'])
+            response = choice(['直接来！吧！', '不多不少，赢的真是好极了', '强', '那你能赢我吗'])
             await pokemon.send(response)
         else:
-            response = choice(['我来落井下石了', '我也来提款', '挑个软柿子捏捏'])
+            response = choice(['这对战啊，不能输的太多', '我也来提款', '挑个软柿子捏捏'])
             await pokemon.send(response)
     elif 3 <= wins - losses <= 4 or 3 <= losses - wins <= 4:  # major lead for either
         response = choice(['离谱', '太狠了', '真牛蛙', '挫挫你的锐气'])
@@ -106,16 +106,16 @@ async def got_result(bot: Bot, event: MessageEvent, state: T_State):
         if state['situation'] == Situation.ALL_TIES:
             await pokemon.finish('离大谱，这合理吗')
         else:
-            await pokemon.finish(choice(['就这样吧', '好平', '不亏不亏']))
+            await pokemon.finish(choice(['就这样吧', '好平', '不亏不亏', '弄肺C肝', '这宝可梦都齐了怎么还不赢啊']))
     elif wins == losses:
-        await pokemon.finish(choice(['什么嘛，我打的还是蛮平的嘛', '还是立于不败之地', '还行吧']))
+        await pokemon.finish(choice(['什么嘛，我打的还是蛮平的嘛', '还是立于不败之地', '还行吧', '不给赢是吧，不给赢，我就炸死你！']))
     elif 1 <= wins - losses <= 2:  # minor win
         fight_against = state['fighting']
         prev_situation = state['situation']
         # won against the winning side
         if (fight_against == 'initiator' and prev_situation == Situation.INITIATOR_LEAD) or\
                 (fight_against == 'opponent' and prev_situation == Situation.OPPONENT_LEAD):
-            await pokemon.finish(choice(['干就完事了', '还好我技高一筹', '小胜小胜']))
+            await pokemon.finish(choice(['干就完事了', '还好我技高一筹', '小胜小胜', '我滴任务完成啦！啊哈哈哈哈~']))
         else:  # won against losing side
             await pokemon.finish(choice(['提款成功', '好耶', '舒服']))
     elif 1 <= losses - wins <= 2:  # minor loss
@@ -124,9 +124,9 @@ async def got_result(bot: Bot, event: MessageEvent, state: T_State):
         # lost against the winning side
         if (fight_against == 'initiator' and prev_situation == Situation.INITIATOR_LEAD) or \
                 (fight_against == 'opponent' and prev_situation == Situation.OPPONENT_LEAD):
-            await pokemon.finish(choice(['尬住了', '可惜可惜', '你可能小赚，但我永远不亏', '呜呜爬了']))
+            await pokemon.finish(choice(['尬住了', '可惜可惜', '你可能小赚，但我永远不亏', '呜呜爬了', '害羞羞，今天是谁要陷害我，白咕咕是你是吧']))
         else: # lost against losing side
-            await pokemon.finish(choice(['那没事了', '溜了', '呜呜送财了']))
+            await pokemon.finish(choice(['那没事了', '溜了', '呜呜送财了', '这宝可梦啊，十分滴珍贵，得让同志们先赢']))
     elif 3 <= wins - losses <= 4:  # major win
         fight_against = state['fighting']
         prev_situation = state['situation']
@@ -144,7 +144,7 @@ async def got_result(bot: Bot, event: MessageEvent, state: T_State):
                 (fight_against == 'opponent' and prev_situation == Situation.OPPONENT_LEAD):
             await pokemon.finish(choice(['寄！', '我爬了', '白咕咕你是不是故意搞我啊', '我起了，一枪秒了，有什么好说的']))
         else:  # lost against losing side
-            await pokemon.finish(choice(['那没事了', '溜了', '送财童子就是我啊，那没事了']))
+            await pokemon.finish(choice(['那没事了', '溜了', '送财童子就是我啊，那没事了', '这对战我打了，我肯定得死，不打，也别想活着！']))
     elif 5 <= wins - losses:  # super win
         await pokemon.finish(choice(['逆天', '害怕', '什么情况']))
     elif losses - wins >= 5:
