@@ -76,13 +76,15 @@ async def received(bot: Bot, event: MessageEvent, state: T_State):
             print('get img called with url:', img_url)
             if not CLIENT.get_image(img_url):
                 await dynamic.send(f'无法接收第{i}张图片')
-        await dynamic.send(f'共收到{len(CLIENT.dynamic_img_list)}张图片')
+        # await dynamic.send(f'共收到{len(CLIENT.dynamic_img_list)}张图片')
+        await dynamic.reject(f'共收到{len(CLIENT.dynamic_img_list)}张图片')
 
     if len(text_segments) > 0:  # has text, concat all text segments and append
         CLIENT.dynamic_text += '\n' + ''.join(map(str, text_segments))
-        await dynamic.send('收到一段文字')
+        # await dynamic.send('收到一段文字')
+        await dynamic.reject('收到一段文字')
 
-    await dynamic.reject('继续接收中，输入 /发送 即可发布动态')
+    ###await dynamic.reject('继续接收中，输入 /发送 即可发布动态')
 
 
 # call the login method on CLIENT
